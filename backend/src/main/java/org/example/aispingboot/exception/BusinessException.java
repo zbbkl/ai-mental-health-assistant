@@ -1,6 +1,7 @@
 package org.example.aispingboot.exception;
 
 import lombok.Getter;
+import org.example.aispingboot.common.ResultCode;
 
 /**
  * 业务异常类
@@ -14,7 +15,8 @@ public class BusinessException extends RuntimeException {
 
     public BusinessException(String message) {
         super(message);
-        this.code = "BUSINESS_ERROR";
+        // 与 ResultCode 保持同一套编码，避免出现枚举里查不到的 "BUSINESS_ERROR" 这种孤立取值
+        this.code = ResultCode.BUSINESS_ERROR.getCode();
         this.message = message;
         this.data = null;
     }

@@ -8,7 +8,6 @@ import org.example.aispingboot.DTO.command.UserRegisterCommandDTO;
 import org.example.aispingboot.DTO.response.UserLoginResponseDTO;
 import org.example.aispingboot.common.Result;
 import org.example.aispingboot.entity.User;
-import org.example.aispingboot.enumClass.UserType;
 import org.example.aispingboot.exception.BusinessException;
 import org.example.aispingboot.mapper.UserMapper;
 import org.example.aispingboot.service.convert.UserConvert;
@@ -76,12 +75,8 @@ public class UserService {
             throw new BusinessException("邮箱已存在");
         }
 
-        // 用户类型
-        if (!UserType.isValidCode(commandDTO.getUserType())) {
-            throw new BusinessException("无效的用户类型");
-        }
-
         // 创建用户
+        // 用户类型由服务端固定为普通用户：注册接口是公开的，不允许外部指定角色
         String password = commandDTO.getPassword().trim();
         String encodedPassword = passwordEncoder.encode(password);
         User user = UserConvert.registerCommandToEntity(commandDTO, encodedPassword);

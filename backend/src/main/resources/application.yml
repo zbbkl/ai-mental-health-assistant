@@ -32,7 +32,8 @@ app:
 
 # JWT配置
 jwt:
-  secret: MySecretKeyForJWT2025!@#$%^&*()_+SecureKeyHere
+  # 通过环境变量注入：JWT_SECRET=xxx；生产环境务必覆盖，泄露后可被伪造任意用户身份
+  secret: "${JWT_SECRET:MySecretKeyForJWT2025!@#$%^&*()_+SecureKeyHere}"
   expiration: 86400000  # 24小时（毫秒）
   refresh-expiration: 604800000  # 7天（毫秒）
   header: Authorization  # token头部名称

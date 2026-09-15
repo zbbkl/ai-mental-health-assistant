@@ -17,7 +17,7 @@ public class ResponseUtil {
         // 根据不同结果码返回不同的响应
         int status = switch (resultCode) {
             case UNAUTHORIZED, ACCESS_UNAUTHORIZED, TOKEN_INVALID, TOKEN_EXPIRED, TOKEN_BLOCKED -> HttpStatus.UNAUTHORIZED.value();
-            case TOKEN_ACCESS_FORBIDDEN -> HttpStatus.FORBIDDEN.value();
+            case TOKEN_ACCESS_FORBIDDEN, NO_PERMISSION, AUTHORIZED_ERROR -> HttpStatus.FORBIDDEN.value();
             default -> HttpStatus.BAD_REQUEST.value();
         };
         response.setStatus(status);

@@ -17,9 +17,11 @@ public class UserRegisterCommandDTO {
 //            "phone": "string",
 //            "password": "string",
 //            "confirmPassword": "string",
-//            "gender": 0,
-//            "userType": 0
+//            "gender": 0
 //    }
+//
+//  注意：注册接口是公开的，这里刻意不接收 userType。
+//  否则任何人都能在注册时把自己指定成管理员（userType=2）。
 
     @NotBlank(message = "用户名不能为空")
     @Size(min = 3, max = 50, message = "用户名长度必须在3到50个字符之间")
@@ -41,6 +43,5 @@ public class UserRegisterCommandDTO {
     private String confirmPassword;
 
     private Integer gender;
-    private Integer userType = 1;
     private LocalDate birthday;
 }

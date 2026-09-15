@@ -6,6 +6,7 @@ public enum ResultCode {
     ERROR("-1", "操作失败"),
     UNAUTHORIZED("401", "暂未登录或token已经过期"),
     NOT_FOUND("404", "资源不存在"),
+    NO_PERMISSION("403", "无权限访问该功能"),
     SYSTEM_ERROR("500", "系统错误"),
 
     // 参数相关错误

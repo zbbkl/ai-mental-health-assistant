@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.example.aispingboot.exception.BusinessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -33,6 +34,13 @@ public class GlobarExceptionHandler {
             return Result.error(e.getCode(), e.getMessage(), e.getData());
         }
         return Result.error(e.getCode(), e.getMessage(), null);
+    }
+
+    // 请求体格式错误（JSON 语法错误、字段类型不匹配等）
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public Result<String> handleMessageNotReadable(HttpMessageNotReadableException e) {
+        return Result.error(ResultCode.PARAM_INVALID.getCode(), ResultCode.PARAM_INVALID.getMsg(),
+                "请求体格式不正确，请检查字段类型");
     }
 
     // 静态资源不存在时保持 404，避免被下面的兜底处理器改写成 200

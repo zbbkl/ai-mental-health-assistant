@@ -92,18 +92,26 @@ spring:
     password: 你的数据库密码
   ai:
     openai:
+      chat:
+        options:
+          model: deepseek-ai/DeepSeek-V3
       api-key: 你的硅基流动APIKey      # 目前是占位符 you-key，必须替换
       base-url: https://api.siliconflow.cn
 ```
 
-> API Key 到[硅基流动](https://siliconflow.cn)申请，模型用的是 `deepseek-ai/DeepSeek-V3`。
+> API Key 到[硅基流动](https://cloud.siliconflow.cn)申请，模型用的是 `deepseek-ai/DeepSeek-V3`。
+> 想换成 DeepSeek 官方平台也可以，把 `base-url` 改成 `https://api.deepseek.com`、`model` 改成 `deepseek-chat`，
+> 但 **Key 必须和平台匹配** —— 拿硅基流动的 Key 去请求 DeepSeek 官方会返回 401。
 
 ```bash
 cd backend
 ./mvnw spring-boot:run        # Windows: .\mvnw.cmd spring-boot:run
 ```
 
-后端默认监听 **1236** 端口（见 `application.yml` 的 `server.port`）。
+后端默认监听 **1236** 端口（见 `application.yml` 的 `server.port`）。启动时会检查 `api-key` 是否仍是占位值并打印 WARN；Key 无效时 AI 对话会失败，情绪日记的分析任务会在 `ai_analysis_task.error_message` 里记下模型服务返回的原始错误（例如 `HTTP 401 - {"code":30014,"message":"Token is invalid."}`），可以据此判断是 Key 问题还是网络问题。
+
+> **JWT 密钥支持环境变量覆盖**：`JWT_SECRET`（未设置时用配置文件里的默认值，启动日志会给出告警）。
+> 这一项与 AI 无关，属于安全加固，不设置也能正常跑。
 
 ### 3. 启动前端
 
@@ -141,35 +149,39 @@ Vite 默认起在 `http://localhost:5173`。`/api` 与 `/files` 请求由 dev se
 - `GET /api/knowledge/category/tree`、`GET /api/knowledge/article/page`、`GET /api/knowledge/article/{id}`
 - `GET /files/**`（上传后的静态图片；页面里 `<img>` 请求不会带 token，因此必须放行）
 
-其余接口都需要在请求头带上 `token`。
+其余接口都需要在请求头带上 `token`。另有 7 个**仅管理员**（`user_type = 2`）可访问的接口，在 `SecurityConfig` 的 `ADMIN_RULES` 中集中声明，非管理员返回 HTTP 403 + `{"code":"403","msg":"无权限访问该功能"}`：
+
+- `GET /api/data-analytics/overview`
+- `GET /api/emotion-diary/admin/page`、`DELETE /api/emotion-diary/admin/{id}`
+- `POST /api/knowledge/article`、`PUT /api/knowledge/article/{id}`、`PUT /api/knowledge/article/{id}/status`、`DELETE /api/knowledge/article/{id}`
 
 已实现的接口：
 
-| 方法 | 路径 | 说明 |
-| --- | --- | --- |
-| POST | `/api/user/login` | 登录 |
-| POST | `/api/user/add` | 注册 |
-| GET | `/api/user/current` | 当前用户信息 |
-| POST | `/api/user/logout` | 退出登录（JWT 无状态，服务端只返回成功，由前端清理本地 token） |
-| POST | `/api/file/upload` | 文件上传（multipart：file / businessType / businessId / businessField），返回 `filePath` |
-| GET | `/api/knowledge/category/tree` | 文章分类树 |
-| GET | `/api/knowledge/article/page` | 文章分页，支持 title / categoryId / status / sortField / sortDirection |
-| GET | `/api/knowledge/article/{id}` | 文章详情（含 `tagArray`，正文 `content` 只在详情返回） |
-| POST | `/api/knowledge/article` | 新增文章（新建落为草稿，状态 0） |
-| PUT | `/api/knowledge/article/{id}` | 编辑文章 |
-| PUT | `/api/knowledge/article/{id}/status` | 发布 / 下线（body：`{"status":1}`，首次发布写入 `published_at`） |
-| DELETE | `/api/knowledge/article/{id}` | 删除文章 |
-| POST | `/api/psychological-chat/session/start` | 创建会话 |
-| POST | `/api/psychological-chat/stream` | AI 流式对话（SSE） |
-| GET | `/api/psychological-chat/sessions` | 会话分页（管理员看全部，普通用户只看自己的） |
-| GET | `/api/psychological-chat/sessions/{id}/messages` | 会话消息记录 |
-| DELETE | `/api/psychological-chat/sessions/{id}` | 删除会话（消息表外键级联删除） |
-| GET | `/api/psychological-chat/session/{id}/emotion` | 会话最近一次情绪分析，兼容 `session_` 前缀 |
-| POST | `/api/emotion-diary` | 提交情绪日记（`user_id + diary_date` 唯一，同一天重复提交按更新处理） |
-| GET | `/api/emotion-diary/admin/page` | 情绪日志分页，支持 userId / moodScreRange（如 `7-10`） |
-| DELETE | `/api/emotion-diary/admin/{id}` | 删除情绪日志 |
-| GET | `/api/data-analytics/overview` | 管理端数据分析总览 |
-| GET | `/api/test` | 连通性测试 |
+| 方法 | 路径 | 说明 | 权限 |
+| --- | --- | --- | --- |
+| POST | `/api/user/login` | 登录 | 公开 |
+| POST | `/api/user/add` | 注册（**不接受 `userType`，一律注册为普通用户**） | 公开 |
+| GET | `/api/user/current` | 当前用户信息 | 登录 |
+| POST | `/api/user/logout` | 退出登录（JWT 无状态，服务端只返回成功，由前端清理本地 token） | 登录 |
+| POST | `/api/file/upload` | 文件上传（multipart：file / businessType / businessId / businessField），返回 `filePath` | 登录 |
+| GET | `/api/knowledge/category/tree` | 文章分类树 | 公开 |
+| GET | `/api/knowledge/article/page` | 文章分页，支持 title / categoryId / status / sortField / sortDirection | 公开（非管理员强制只看已发布） |
+| GET | `/api/knowledge/article/{id}` | 文章详情（含 `tagArray`，正文 `content` 只在详情返回） | 公开 |
+| POST | `/api/knowledge/article` | 新增文章（新建落为草稿，状态 0） | 管理员 |
+| PUT | `/api/knowledge/article/{id}` | 编辑文章 | 管理员 |
+| PUT | `/api/knowledge/article/{id}/status` | 发布 / 下线（body：`{"status":1}`，首次发布写入 `published_at`） | 管理员 |
+| DELETE | `/api/knowledge/article/{id}` | 删除文章 | 管理员 |
+| POST | `/api/psychological-chat/session/start` | 创建会话 | 登录 |
+| POST | `/api/psychological-chat/stream` | AI 流式对话（SSE） | 登录 |
+| GET | `/api/psychological-chat/sessions` | 会话分页（管理员看全部，普通用户只看自己的） | 登录 |
+| GET | `/api/psychological-chat/sessions/{id}/messages` | 会话消息记录（非本人且非管理员返回业务错误） | 登录 |
+| DELETE | `/api/psychological-chat/sessions/{id}` | 删除会话（消息表外键级联删除） | 登录 |
+| GET | `/api/psychological-chat/session/{id}/emotion` | 会话最近一次情绪分析，兼容 `session_` 前缀 | 登录 |
+| POST | `/api/emotion-diary` | 提交情绪日记（`user_id + diary_date` 唯一，同一天重复提交按更新处理） | 登录 |
+| GET | `/api/emotion-diary/admin/page` | 情绪日志分页，支持 userId / moodScreRange（如 `7-10`） | 管理员 |
+| DELETE | `/api/emotion-diary/admin/{id}` | 删除情绪日志 | 管理员 |
+| GET | `/api/data-analytics/overview` | 管理端数据分析总览 | 管理员 |
+| GET | `/api/test` | 连通性测试 | 公开 |
 
 分页参数兼容多种命名：`currentPage` / `pageNum` / `current` 与 `size` / `pageSize` 都能识别（前端各页面用的不一致），统一由 `PageQuery` 解析；列表统一返回 `{ records, total, current, size }`。
 
@@ -177,31 +189,36 @@ Vite 默认起在 `http://localhost:5173`。`/api` 与 `/files` 请求由 dev se
 
 上传接口把文件写在 `backend/uploads/files/` 下，通过 `/files/**` 对外访问。数据库 `sys_file_info.file_path` 存的是 `/files/bussiness/article/xxx.png` 这类相对路径，前端用 `frontend/src/config/index.js` 里的 `fileBaseUrl` 拼成完整地址。上传目录已加入 `.gitignore`，运行目录由 `application.yml` 的 `app.upload.root` 控制。
 
+## 权限模型
+
+| 角色 | `user_type` | 说明 |
+| --- | --- | --- |
+| 普通用户 | 1 | 注册接口默认角色；只能读写自己的会话、情绪日记 |
+| 管理员 | 2 | 管理端全站数据与内容管理 |
+
+两条要点：
+
+1. **注册接口不能赋予角色。** `UserRegisterCommandDTO` 刻意不接收 `userType`，`UserConvert` 里写死普通用户。新增管理员只能直接改数据库（`update user set user_type = 2 where username = 'xxx'`），或另做一套由管理员授权的后台功能。
+2. **角色判定以数据库当前值为准，不读 token 里的 `roleType`。** `JwtAuthticationFilter` 每次请求都会按 `user_id` 查一次用户，用**当前** `user_type` 生成 `ROLE_1` / `ROLE_2` 权限，`SecurityConfig` 的 `hasRole("2")` 与 `CurrentUserUtil.currentUserIsAdmin()` 都基于它。这样管理员被降权或被禁用后，旧 token 立即失效，不存在最长 24 小时的权限残留。
+
+### 情绪日记的 AI 分析
+
+提交（或同日重新提交）情绪日记后，`EmotionAnalysisService` 会**异步**调用 DeepSeek 生成情绪分析，结果写入 `emotion_diary.ai_emotion_analysis` 并更新 `ai_analysis_updated_at`：
+
+- 触发时机在事务提交之后（`TransactionSynchronization#afterCommit`），避免异步线程读到未提交的数据；
+- 每次分析都会在 `ai_analysis_task` 落一条记录（`task_type = AUTO`），状态依次为 `PENDING → PROCESSING → COMPLETED`，失败则记 `FAILED` 并把异常信息写入 `error_message`；
+- **分析失败不影响用户提交**：异常全部在异步服务内消化，日记本身照常保存，`ai_emotion_analysis` 保持为空，管理端详情里的该区块显示占位内容；
+- AI Key 未配置（仍是 `you-key` 占位值）或模型不可用时会看到 `FAILED` 任务，这是预期行为，把 `application.yml` 里的 `api-key` 换成真实 Key 后重新提交即可。
+
 ## 已知问题与待办
 
-1. **【越权 · 待修】管理端接口缺少角色校验，普通用户可执行管理员操作。**
-
-   `SecurityConfig` 只做到了「认证」（`anyRequest().authenticated()`），**没有做「授权」**。新增的管理端接口里，只有 `Knowledge#articlePage` 判断了管理员身份，其余管理端接口只调用了 `CurrentUserUtil.requireUserId()` 甚至完全没有校验。因此任何已登录的普通用户（`user_type = 1`）持自己的 token 即可访问：
-
-   | 接口 | 应有权限 | 实际 |
-   | --- | --- | --- |
-   | `POST /api/knowledge/article` | 管理员 | 任意登录用户可创建文章 |
-   | `PUT /api/knowledge/article/{id}` | 管理员 | 任意登录用户可编辑任意文章 |
-   | `PUT /api/knowledge/article/{id}/status` | 管理员 | 任意登录用户可发布/下线 |
-   | `DELETE /api/knowledge/article/{id}` | 管理员 | 任意登录用户可删除任意文章 |
-   | `GET /api/emotion-diary/admin/page` | 管理员 | 任意登录用户可读**全部用户**的情绪日志 |
-   | `DELETE /api/emotion-diary/admin/{id}` | 管理员 | 任意登录用户可删除他人情绪日志 |
-   | `GET /api/data-analytics/overview` | 管理员 | 任意登录用户可读平台统计数据 |
-
-   以上除 `articlePage` 外均已实测复现（用 `user_type=1` 的账号调用，均返回 `code: 200`）。
-
-   修复思路：在 `CurrentUserUtil` 中增加 `requireAdmin()`（非管理员直接抛 `BusinessException`），并在上表 7 个接口入口调用。注意 `CurrentUserUtil#currentUserIsAdmin()` 读的是 **token 里的 `roleType` claim**，而非数据库当前 `user_type`：token 有效期 24 小时内，即使管理员已被降权，旧 token 仍然有效，因此更稳妥的做法是查库校验当前用户的 `user_type`。
-
-2. **AI Key 是占位的。** `application.yml` 里 `api-key: you-key` 必须换成真实 Key，否则 AI 对话不可用（其余功能不受影响）。
-3. **JWT 密钥是明文。** `jwt.secret` 直接写在配置文件里，生产环境应改为环境变量注入。
-4. **情绪分析没有自动触发。** 新提交的情绪日记不会自动生成 `ai_emotion_analysis`，管理端详情里的 AI 分析只有历史示例数据有值。`ai_analysis_task` 表已建好，可以基于它补一个异步分析任务。
-5. **实体必须有无参构造函数。** 实体类用 `@Data @Builder`，Lombok 只会生成全参构造函数；缺少 `@NoArgsConstructor` 时，MyBatis 会退化成"按列顺序填充构造函数参数"，字段数与表列数一旦不一致就直接抛 `IndexOutOfBoundsException`（新增实体字段时尤其容易踩）。现有实体已统一补上 `@NoArgsConstructor` 和 `@AllArgsConstructor`。
-6. **数据分析的统计窗口会退让。** 趋势图默认统计最近 7 天；若最近 7 天完全没有数据（例如库中是历史示例数据），窗口会自动锚定到最近一次有数据的日期，避免图表全空。逻辑在 `DataAnalyticsService#resolveWindowEnd`，不需要这个行为可以直接去掉。
+1. **AI Key 是占位的。** `application.yml` 里的 `api-key: you-key` 需要换成真实 Key，否则 AI 对话与情绪日记分析都会失败（启动日志有 WARN，失败会记录在 `ai_analysis_task.error_message`）。其余功能不受影响。
+2. **JWT 密钥仍是配置文件里的默认值。** 已支持环境变量 `JWT_SECRET` 覆盖，但默认值写在仓库里，生产环境必须覆盖（启动日志有 WARN）。
+3. **数据库账号密码仍是明文。** `spring.datasource` 的账号密码尚未改为环境变量注入，与上面两项同理。
+4. **实体必须有无参构造函数。** 实体类用 `@Data @Builder`，Lombok 只会生成全参构造函数；缺少 `@NoArgsConstructor` 时，MyBatis 会退化成"按列顺序填充构造函数参数"，字段数与表列数一旦不一致就直接抛 `IndexOutOfBoundsException`（新增实体字段时尤其容易踩）。现有实体已统一补上 `@NoArgsConstructor` 和 `@AllArgsConstructor`。
+5. **数据分析的统计窗口会退让。** 趋势图默认统计最近 7 天；若最近 7 天完全没有数据（例如库中是历史示例数据），窗口会自动锚定到最近一次有数据的日期，避免图表全空。逻辑在 `DataAnalyticsService#resolveWindowEnd`，不需要这个行为可以直接去掉。
+6. **会话的情绪分析没有回写。** `consultation_session.last_emotion_analysis` 目前只有示例数据，`GET /api/psychological-chat/session/{id}/emotion` 只是把库里的 JSON 读出来；对话结束后的情绪分析需要另做（可复用 `EmotionAnalysisService` 的调用方式）。
+7. **上传文件没有清理机制。** `sys_file_info` 里 `is_temp = 1` 的临时文件带 `expire_time`，但没有定时任务真正删除过期文件。
 
 ## 排查：后端依赖拉不下来
 

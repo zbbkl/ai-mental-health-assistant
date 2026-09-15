@@ -3,6 +3,7 @@ package org.example.aispingboot.controller;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.example.aispingboot.DTO.command.ArticleSaveCommandDTO;
+import org.example.aispingboot.DTO.command.ArticleStatusCommandDTO;
 import org.example.aispingboot.DTO.command.PageQuery;
 import org.example.aispingboot.DTO.response.ArticleResponseDTO;
 import org.example.aispingboot.common.PageResult;
@@ -21,7 +22,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/knowledge")
@@ -83,8 +83,9 @@ public class Knowledge {
 
     // 发布 / 下线
     @PutMapping("/article/{id}/status")
-    public Result<Void> changeArticleStatus(@PathVariable String id, @RequestBody Map<String, Integer> body) {
-        knowledgeService.changeArticleStatus(id, body.get("status"));
+    public Result<Void> changeArticleStatus(@PathVariable String id,
+                                            @Valid @RequestBody ArticleStatusCommandDTO command) {
+        knowledgeService.changeArticleStatus(id, command.getStatus());
         return Result.ok();
     }
 

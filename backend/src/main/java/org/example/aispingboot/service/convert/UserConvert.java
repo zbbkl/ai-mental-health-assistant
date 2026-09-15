@@ -4,6 +4,7 @@ import org.example.aispingboot.DTO.command.UserRegisterCommandDTO;
 import org.example.aispingboot.DTO.response.UserLoginResponseDTO;
 import org.example.aispingboot.entity.User;
 import org.example.aispingboot.enumClass.UserStatus;
+import org.example.aispingboot.enumClass.UserType;
 
 import java.time.LocalDateTime;
 
@@ -47,7 +48,8 @@ public class UserConvert {
                 .phone(commandDTO.getPhone())
                 .gender(commandDTO.getGender())
                 .birthday(commandDTO.getBirthday())
-                .userType(commandDTO.getUserType())
+                // 注册一律为普通用户，管理员只能由数据库侧或后续后台功能赋予
+                .userType(UserType.USER.getCode())
                 .status(UserStatus.NORMAL.getCode())
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())

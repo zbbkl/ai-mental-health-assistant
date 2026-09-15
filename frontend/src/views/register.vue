@@ -72,16 +72,11 @@ const submitFormRef = ref(null)
 const submitForm = async (formEl) => {
     if (!formEl) return
     formEl.validate(async (valid) => {
-        register(formData).then(({ data }) => {
-            console.log(data)
-            if (!data) {
-                ElMessage.success('注册成功')
-                // 注册成功后跳转到登录页
-                router.push('/auth/login')
-            }
-            if (data.code === "BUSINESS_ERROR") {
-               ElMessage.error(data.message)
-            }
+        if (!valid) return
+        // 失败（用户名已存在等）由 axios 拦截器统一提示，这里只负责成功后的跳转
+        register(formData).then(() => {
+            ElMessage.success('注册成功')
+            router.push('/auth/login')
         })
     })
 }

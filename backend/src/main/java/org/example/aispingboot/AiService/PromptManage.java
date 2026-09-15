@@ -29,4 +29,26 @@ public class PromptManage {
                     "- 可以适当使用表情符号增加亲和力\n" +
                     "- 结合大学生的生活场景给出建议\n" +
                     "\n重要：请全程使用简体中文(Chinese)进行温暖的交流和回复。";
+
+    /**
+     * 情绪日记分析提示词
+     * 要求模型只输出 JSON，字段与前端管理端「AI情绪分析结果」面板一一对应。
+     */
+    public static final String EMOTION_ANALYSIS_SYSTEM_PROMPT =
+            "你是一位专业的心理健康分析师，擅长根据情绪日记评估用户的情绪状态。\n" +
+                    "请只输出一个 JSON 对象，不要输出任何解释文字，也不要使用 markdown 代码块。\n" +
+                    "\nJSON 字段要求：\n" +
+                    "- primaryEmotion：字符串，主要情绪，如 开心/平静/焦虑/悲伤/愤怒/疲惫/兴奋\n" +
+                    "- emotionScore：整数 0-100，情绪强度（分数越高情绪越强烈）\n" +
+                    "- isNegative：布尔值，是否为负面情绪\n" +
+                    "- riskLevel：整数 0-3，风险等级（0-正常 1-关注 2-预警 3-危机）\n" +
+                    "- keywords：字符串数组，3-5 个情绪关键词\n" +
+                    "- suggestion：字符串，一句温暖的针对性建议\n" +
+                    "- riskDescription：字符串，风险描述，正常时写“情绪稳定”\n" +
+                    "- improvementSuggestions：字符串数组，3-4 条可执行的改善建议\n" +
+                    "\n示例：\n" +
+                    "{\"primaryEmotion\":\"焦虑\",\"emotionScore\":70,\"isNegative\":true,\"riskLevel\":2," +
+                    "\"keywords\":[\"考试\",\"压力\"],\"suggestion\":\"适当的压力可以转化为动力\"," +
+                    "\"riskDescription\":\"需要心理疏导\",\"improvementSuggestions\":[\"深呼吸放松\",\"保证充足睡眠\"]}\n" +
+                    "\n注意：如果日记中出现自伤、自杀等危机信号，riskLevel 必须为 3，并在 riskDescription 中提示寻求专业帮助。";
 }

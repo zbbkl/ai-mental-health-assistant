@@ -5,6 +5,7 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
+import org.example.aispingboot.AiService.EmotionAnalysisService;
 import org.example.aispingboot.DTO.command.EmotionDiaryCreateCommandDTO;
 import org.example.aispingboot.DTO.command.PageQuery;
 import org.example.aispingboot.DTO.response.EmotionDiaryResponseDTO;
@@ -16,6 +17,8 @@ import org.example.aispingboot.mapper.EmotionDiaryMapper;
 import org.example.aispingboot.mapper.UserMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -36,6 +39,9 @@ public class EmotionDiaryService {
 
     @Resource
     private UserMapper userMapper;
+
+    @Resource
+    private EmotionAnalysisService emotionAnalysisService;
 
     /**
      * 保存用户当天情绪日记
@@ -67,6 +73,7 @@ public class EmotionDiaryService {
                     .updatedAt(now)
                     .build();
             diaryMapper.insert(diary);
+            triggerAnalysisAfterCommit(diary.getId());
             return toResponse(diary, null);
         }
 
@@ -82,7 +89,26 @@ public class EmotionDiaryService {
                 .build();
         diaryMapper.updateById(update);
 
+        // 内容变了，重新分析（旧的分析结果会被覆盖）
+        triggerAnalysisAfterCommit(existing.getId());
         return toResponse(diaryMapper.selectById(existing.getId()), null);
+    }
+
+    /**
+     * 在事务提交后再触发异步分析
+     * 否则异步线程可能先于事务提交去查这条日记，读到旧数据或查不到。
+     */
+    private void triggerAnalysisAfterCommit(Long diaryId) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    emotionAnalysisService.analyzeDiaryAsync(diaryId);
+                }
+            });
+        } else {
+            emotionAnalysisService.analyzeDiaryAsync(diaryId);
+        }
     }
 
     /**
