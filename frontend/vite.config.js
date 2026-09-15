@@ -12,8 +12,14 @@ export default defineConfig({
   },
   server: {
     proxy: {
+      // 本地后端（backend/src/main/resources/application.yml 中 server.port）
       '/api': {
-        target: 'http://159.75.169.224:1235',
+        target: 'http://localhost:1236',
+        changeOrigin: true
+      },
+      // 上传后的静态文件由后端 /files/** 提供
+      '/files': {
+        target: 'http://localhost:1236',
         changeOrigin: true
       }
     }

@@ -5,14 +5,18 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
 @Data
 @TableName("consultation_session")
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class ConsultationSession {
     // 会话ID
     @TableId(type = IdType.AUTO)

@@ -32,6 +32,7 @@ AI全栈心理健康助手/
 │   │   ├── service/             # 业务逻辑
 │   │   └── util/                # JWT 工具与过滤器
 │   ├── src/main/resources/application.yml
+│   ├── uploads/                # 运行时生成：上传的文件（已 gitignore）
 │   └── pom.xml
 ├── database/
 │   └── mental_health_assistant.sql   # 建表语句 + 示例数据
@@ -112,7 +113,7 @@ npm install
 npm run dev
 ```
 
-Vite 默认起在 `http://localhost:5173`。`/api` 请求由 dev server 代理转发（见下方"已知问题"）。
+Vite 默认起在 `http://localhost:5173`。`/api` 与 `/files` 请求由 dev server 代理到本地后端 `http://localhost:1236`（见 `vite.config.js`）。
 
 ### 4. 访问
 
@@ -131,28 +132,76 @@ Vite 默认起在 `http://localhost:5173`。`/api` 请求由 dev server 代理�
 { "code": "200", "msg": "success", "data": {} }
 ```
 
-前端 axios 拦截器会自动取出 `data`，`code` 为 `-1` 时判定登录过期并跳转登录页。请求头携带 token 的字段名是 **`token`**（不是 `Authorization`）。
+前端 axios 拦截器会自动取出 `data`；`code` 不为 `200` 时会弹出 `msg`（参数校验失败时展示具体字段提示）并 **reject**，调用方的 `.then` 不会再把失败当成功执行。请求头携带 token 的字段名是 **`token`**（不是 `Authorization`）。
 
-后端目前已实现的接口：
+以下接口无需登录即可访问（在 `SecurityConfig` 中按"请求方法 + 路径"成对放行）：
+
+- `GET /api/test`
+- `POST /api/user/login`、`POST /api/user/add`
+- `GET /api/knowledge/category/tree`、`GET /api/knowledge/article/page`、`GET /api/knowledge/article/{id}`
+- `GET /files/**`（上传后的静态图片；页面里 `<img>` 请求不会带 token，因此必须放行）
+
+其余接口都需要在请求头带上 `token`。
+
+已实现的接口：
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | POST | `/api/user/login` | 登录 |
 | POST | `/api/user/add` | 注册 |
 | GET | `/api/user/current` | 当前用户信息 |
+| POST | `/api/user/logout` | 退出登录（JWT 无状态，服务端只返回成功，由前端清理本地 token） |
+| POST | `/api/file/upload` | 文件上传（multipart：file / businessType / businessId / businessField），返回 `filePath` |
+| GET | `/api/knowledge/category/tree` | 文章分类树 |
+| GET | `/api/knowledge/article/page` | 文章分页，支持 title / categoryId / status / sortField / sortDirection |
+| GET | `/api/knowledge/article/{id}` | 文章详情（含 `tagArray`，正文 `content` 只在详情返回） |
+| POST | `/api/knowledge/article` | 新增文章（新建落为草稿，状态 0） |
+| PUT | `/api/knowledge/article/{id}` | 编辑文章 |
+| PUT | `/api/knowledge/article/{id}/status` | 发布 / 下线（body：`{"status":1}`，首次发布写入 `published_at`） |
+| DELETE | `/api/knowledge/article/{id}` | 删除文章 |
 | POST | `/api/psychological-chat/session/start` | 创建会话 |
 | POST | `/api/psychological-chat/stream` | AI 流式对话（SSE） |
+| GET | `/api/psychological-chat/sessions` | 会话分页（管理员看全部，普通用户只看自己的） |
+| GET | `/api/psychological-chat/sessions/{id}/messages` | 会话消息记录 |
+| DELETE | `/api/psychological-chat/sessions/{id}` | 删除会话（消息表外键级联删除） |
+| GET | `/api/psychological-chat/session/{id}/emotion` | 会话最近一次情绪分析，兼容 `session_` 前缀 |
+| POST | `/api/emotion-diary` | 提交情绪日记（`user_id + diary_date` 唯一，同一天重复提交按更新处理） |
+| GET | `/api/emotion-diary/admin/page` | 情绪日志分页，支持 userId / moodScreRange（如 `7-10`） |
+| DELETE | `/api/emotion-diary/admin/{id}` | 删除情绪日志 |
+| GET | `/api/data-analytics/overview` | 管理端数据分析总览 |
 | GET | `/api/test` | 连通性测试 |
+
+分页参数兼容多种命名：`currentPage` / `pageNum` / `current` 与 `size` / `pageSize` 都能识别（前端各页面用的不一致），统一由 `PageQuery` 解析；列表统一返回 `{ records, total, current, size }`。
+
+### 上传文件的存放
+
+上传接口把文件写在 `backend/uploads/files/` 下，通过 `/files/**` 对外访问。数据库 `sys_file_info.file_path` 存的是 `/files/bussiness/article/xxx.png` 这类相对路径，前端用 `frontend/src/config/index.js` 里的 `fileBaseUrl` 拼成完整地址。上传目录已加入 `.gitignore`，运行目录由 `application.yml` 的 `app.upload.root` 控制。
 
 ## 已知问题与待办
 
-整理目录时发现以下几处，需要你按需处理：
+1. **【越权 · 待修】管理端接口缺少角色校验，普通用户可执行管理员操作。**
 
-1. **前后端接口对不上。** 前端 `src/api/` 里调用了 `/knowledge/article/*`、`/knowledge/category/tree`、`/emotion-diary/*`、`/data-analytics/overview`、`/file/upload`、`/user/logout` 等接口，但后端源码里目前只有 `User`、`PsychologicalChat`、`Test` 三个 controller。这些接口需要补齐后才能跑通对应页面。
-2. **端口不一致。** 后端配置的是 `1236`，但 `frontend/vite.config.js` 的代理指向 `http://159.75.169.224:1235`（一台远端服务器），不是本地后端。本地联调请把 target 改成 `http://localhost:1236`。
-3. **文件基址写死了。** `frontend/src/config/index.js` 里 `fileBaseUrl` 硬编码为远端地址，本地部署需同步修改。
-4. **密钥是占位的。** `application.yml` 里 `api-key: you-key` 必须换成真实 Key，否则 AI 对话不可用。
-5. **JWT 密钥是明文。** `jwt.secret` 直接写在配置文件里，生产环境应改为环境变量注入。
+   `SecurityConfig` 只做到了「认证」（`anyRequest().authenticated()`），**没有做「授权」**。新增的管理端接口里，只有 `Knowledge#articlePage` 判断了管理员身份，其余管理端接口只调用了 `CurrentUserUtil.requireUserId()` 甚至完全没有校验。因此任何已登录的普通用户（`user_type = 1`）持自己的 token 即可访问：
+
+   | 接口 | 应有权限 | 实际 |
+   | --- | --- | --- |
+   | `POST /api/knowledge/article` | 管理员 | 任意登录用户可创建文章 |
+   | `PUT /api/knowledge/article/{id}` | 管理员 | 任意登录用户可编辑任意文章 |
+   | `PUT /api/knowledge/article/{id}/status` | 管理员 | 任意登录用户可发布/下线 |
+   | `DELETE /api/knowledge/article/{id}` | 管理员 | 任意登录用户可删除任意文章 |
+   | `GET /api/emotion-diary/admin/page` | 管理员 | 任意登录用户可读**全部用户**的情绪日志 |
+   | `DELETE /api/emotion-diary/admin/{id}` | 管理员 | 任意登录用户可删除他人情绪日志 |
+   | `GET /api/data-analytics/overview` | 管理员 | 任意登录用户可读平台统计数据 |
+
+   以上除 `articlePage` 外均已实测复现（用 `user_type=1` 的账号调用，均返回 `code: 200`）。
+
+   修复思路：在 `CurrentUserUtil` 中增加 `requireAdmin()`（非管理员直接抛 `BusinessException`），并在上表 7 个接口入口调用。注意 `CurrentUserUtil#currentUserIsAdmin()` 读的是 **token 里的 `roleType` claim**，而非数据库当前 `user_type`：token 有效期 24 小时内，即使管理员已被降权，旧 token 仍然有效，因此更稳妥的做法是查库校验当前用户的 `user_type`。
+
+2. **AI Key 是占位的。** `application.yml` 里 `api-key: you-key` 必须换成真实 Key，否则 AI 对话不可用（其余功能不受影响）。
+3. **JWT 密钥是明文。** `jwt.secret` 直接写在配置文件里，生产环境应改为环境变量注入。
+4. **情绪分析没有自动触发。** 新提交的情绪日记不会自动生成 `ai_emotion_analysis`，管理端详情里的 AI 分析只有历史示例数据有值。`ai_analysis_task` 表已建好，可以基于它补一个异步分析任务。
+5. **实体必须有无参构造函数。** 实体类用 `@Data @Builder`，Lombok 只会生成全参构造函数；缺少 `@NoArgsConstructor` 时，MyBatis 会退化成"按列顺序填充构造函数参数"，字段数与表列数一旦不一致就直接抛 `IndexOutOfBoundsException`（新增实体字段时尤其容易踩）。现有实体已统一补上 `@NoArgsConstructor` 和 `@AllArgsConstructor`。
+6. **数据分析的统计窗口会退让。** 趋势图默认统计最近 7 天；若最近 7 天完全没有数据（例如库中是历史示例数据），窗口会自动锚定到最近一次有数据的日期，避免图表全空。逻辑在 `DataAnalyticsService#resolveWindowEnd`，不需要这个行为可以直接去掉。
 
 ## 排查：后端依赖拉不下来
 

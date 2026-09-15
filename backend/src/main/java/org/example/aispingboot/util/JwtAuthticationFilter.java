@@ -26,9 +26,8 @@ public class JwtAuthticationFilter extends OncePerRequestFilter {
     private UserService userService;
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        String requestUri = request.getRequestURI();
-        // 检查是否为公开路径
-        return SecurityConfig.isPublicPATH(requestUri);
+        // 检查是否为公开路径（方法 + 路径）
+        return SecurityConfig.isPublicPATH(request.getMethod(), request.getRequestURI());
     }
 
     @Override

@@ -9,8 +9,10 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.example.aispingboot.enumClass.UserStatus;
 import org.example.aispingboot.enumClass.UserType;
 
@@ -20,6 +22,8 @@ import java.time.LocalDateTime;
 @Data
 @TableName("user")
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class User {
     // 用户ID
     @TableId(type = IdType.AUTO)

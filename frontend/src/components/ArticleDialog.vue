@@ -106,8 +106,8 @@ watch(() => props.article, (newVal) => {
             Object.assign(formData, newVal)
             // 使用现有ID
             businessId.value = newVal.id
-            // 封面Url
-            imgUrl.value = fileBaseUrl + newVal.coverImage
+            // 封面Url（未设置封面时为空，避免拼出坏地址）
+            imgUrl.value = newVal.coverImage ? fileBaseUrl + newVal.coverImage : ''
         })
     }
 })

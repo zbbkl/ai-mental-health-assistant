@@ -1,13 +1,18 @@
 package org.example.aispingboot.common;
 
+import lombok.extern.slf4j.Slf4j;
 import org.example.aispingboot.exception.BusinessException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.stream.Collectors;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobarExceptionHandler {
     // 处理参数校验异常
@@ -28,5 +33,20 @@ public class GlobarExceptionHandler {
             return Result.error(e.getCode(), e.getMessage(), e.getData());
         }
         return Result.error(e.getCode(), e.getMessage(), null);
+    }
+
+    // 静态资源不存在时保持 404，避免被下面的兜底处理器改写成 200
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Result<String>> handleNoResourceFound(NoResourceFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Result.error(ResultCode.NOT_FOUND.getCode(), ResultCode.NOT_FOUND.getMsg(), e.getResourcePath()));
+    }
+
+    // 兜底处理其它未预期异常
+    // 没有这层兜底时异常会转发到容器错误页，被安全过滤链改写成无响应体的 403，前端只能看到“打不开”
+    @ExceptionHandler(Exception.class)
+    public Result<String> handleUnexpectedException(Exception e) {
+        log.error("接口处理异常", e);
+        return Result.error(ResultCode.SYSTEM_ERROR.getCode(), ResultCode.SYSTEM_ERROR.getMsg(), e.getMessage());
     }
 }

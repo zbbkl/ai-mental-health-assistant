@@ -44,4 +44,11 @@ public class User {
         return Result.ok(result);
     }
 
+    // 退出登录
+    // token 为无状态 JWT，服务端不保存会话，这里只需返回成功，由前端清除本地存储的 token
+    @PostMapping("/logout")
+    public Result<Void> logout() {
+        return Result.ok();
+    }
+
 }
