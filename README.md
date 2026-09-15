@@ -52,6 +52,15 @@ AI全栈心理健康助手/
 | Maven | 3.8+ | 也可直接用项目自带的 `mvnw` / `mvnw.cmd` |
 | MySQL | 5.7+ / 8.0 | 需要手动建库 |
 
+> **注意 JDK 版本。** 项目必须用 JDK 17 编译。如果命令行 `java -version` 显示的是 1.8 之类的旧版本，请显式设置：
+>
+> ```powershell
+> $env:JAVA_HOME = "C:\Program Files\Java\jdk-17"
+> $env:Path = "$env:JAVA_HOME\bin;$env:Path"
+> ```
+>
+> 用 Maven 时 `JAVA_HOME` 才是指挥编译的开关，`Path` 里那个 `java` 只是顺带。
+
 ## 快速开始
 
 ### 1. 初始化数据库
@@ -144,6 +153,25 @@ Vite 默认起在 `http://localhost:5173`。`/api` 请求由 dev server 代理�
 3. **文件基址写死了。** `frontend/src/config/index.js` 里 `fileBaseUrl` 硬编码为远端地址，本地部署需同步修改。
 4. **密钥是占位的。** `application.yml` 里 `api-key: you-key` 必须换成真实 Key，否则 AI 对话不可用。
 5. **JWT 密钥是明文。** `jwt.secret` 直接写在配置文件里，生产环境应改为环境变量注入。
+
+## 排查：后端依赖拉不下来
+
+**`spring-ai-starter-model-openai` 原为 `1.0.0-SNAPSHOT`，已改为正式版 `1.0.0`。** 快照版本只存在于 Spring 自己的快照仓库 `repo.spring.io/snapshot`，Maven Central 与阿里云镜像都没有；而且原来的 `pom.xml` 也没有声明该仓库，所以那个依赖**在任何网络环境下都拉不到**。改成 GA 正式版后，从 Maven Central（或阿里云镜像）即可正常获取，无需额外配置仓库。
+
+若你仍想用快照版（例如 1.1.x 的新 API），需要两处同时改：在 `pom.xml` 中声明 `<repositories>` 指向 `https://repo.spring.io/snapshot`，并把 `~/.m2/settings.xml` 的镜像改为排除该仓库——否则下面这个通配镜像会把请求继续劫持到阿里云：
+
+```xml
+<mirrorOf>*,!spring-snapshots,!spring-milestones</mirrorOf>
+```
+
+**如果构建报 `(absent)` / `Could not transfer artifact`**，多半是本地仓库里残留了失败缓存。Maven 会把失败的下载记录成 `.lastUpdated` 文件，之后一段时间内直接用缓存判定"不可用"而不再重试。清理后重试：
+
+```powershell
+Get-ChildItem -Path $env:USERPROFILE\.m2\repository, 'D:\DevTools\maven\local' `
+  -Recurse -Filter *.lastUpdated -ErrorAction SilentlyContinue | Remove-Item -Force
+```
+
+然后重新执行 `mvn -U clean package`（`-U` 强制更新快照与失败记录）。
 
 ## 文档
 
