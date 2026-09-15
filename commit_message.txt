@@ -1,0 +1,20 @@
+添加待办实施方案文档与前置改动（未实现业务逻辑）
+
+新增 docs/待办实施方案-会话情绪回写与临时文件清理.md，记录 README 待办 6、7 的
+完整方案、验证办法、风险清单与待决策项，供后续决策后实施。
+
+前置改动（方案的一部分，无业务逻辑）：
+- application.yml：数据库与 JWT 段补充「仅本地运行、日后部署须覆盖」说明；
+  新增 app.upload.cleanup 配置段（enabled / cron / batch-size / dry-run）
+- AiSpingbootApplication：新增 @EnableScheduling（项目此前无任何定时任务）
+- PromptManage：新增 SESSION_EMOTION_ANALYSIS_SYSTEM_PROMPT，
+  强调只依据用户发言判断情绪、忽略 AI 助手措辞
+
+方案要点：
+- 待办 6 存在阻塞：ai_analysis_task.diary_id 为非空且外键指向 emotion_diary，
+  会话分析任务无法写入该表，需先决定任务追踪方式（推荐加 session_id 列）
+- 待办 7 需先修正存量数据：sys_file_info 现有 11 行 is_temp 全为 0，
+  按 README 字面条件（is_temp=1 且过期）命中 0 条，清理任务将永不生效
+- 清理采用软删记录（status=0）+ 物理删除磁盘文件
+
+验证：clean compile 通过（71 个源文件）。

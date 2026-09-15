@@ -1,5 +1,7 @@
 spring:
   datasource:
+    # 本地开发用的默认值。本项目仅在本地运行，未部署到服务器，因此保留明文；
+    # 若日后要部署，请改为环境变量注入（如 ${DB_PASSWORD}）并务必改掉默认密码。
     url: jdbc:mysql://localhost:3306/mental_health_assistant?useSSL=false&serverTimezone=UTC
     username: root
     password: 123456
@@ -29,10 +31,21 @@ server:
 app:
   upload:
     root: uploads
+    # 临时文件（is_temp=1）过期后的清理任务
+    cleanup:
+      # 是否启用清理
+      enabled: true
+      # 清理周期，Spring cron（秒 分 时 日 月 周），默认每天凌晨 3:30
+      cron: "0 30 3 * * ?"
+      # 单次最多删除的记录数，避免一次性删除过多文件
+      batch-size: 200
+      # true=只记录日志不实际删除，建议先设为 true 观察一轮再改 false
+      dry-run: false
 
 # JWT配置
 jwt:
-  # 通过环境变量注入：JWT_SECRET=xxx；生产环境务必覆盖，泄露后可被伪造任意用户身份
+  # 通过环境变量注入：JWT_SECRET=xxx。本地开发沿用下面的默认值；
+  # 本项目仅在本地运行，未部署到服务器；若日后部署务必覆盖，泄露后可被伪造任意用户身份。
   secret: "${JWT_SECRET:MySecretKeyForJWT2025!@#$%^&*()_+SecureKeyHere}"
   expiration: 86400000  # 24小时（毫秒）
   refresh-expiration: 604800000  # 7天（毫秒）
